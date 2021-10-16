@@ -117,7 +117,7 @@ export default function App() {
       />
       <PlayerTable
         players={players_left}
-        playersLeft={Math.max(120 - draftedPlayers.length, 30)}
+        playersLeft={Math.max(90 - draftedPlayers.length, 30)}
         puntedCategories={categories}
         statsLeft={statsLeft}
       />
