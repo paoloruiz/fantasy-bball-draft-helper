@@ -125,7 +125,7 @@ export const getPlayersWithRankings = (
           const puntRank = puntRanks[position].indexOf(player.id);
           return `${position} ${
             puntRank < noPuntRank ? "+" : noPuntRank < puntRank ? "-" : ""
-          }${Math.abs(puntRank - noPuntRank)} (${puntRank})`;
+          }${Math.abs(puntRank - noPuntRank)} (${puntRank + 1})`;
         })
         .join("; ")
     };

@@ -1,10 +1,115 @@
-import { useTable, useSortBy } from "react-table";
+import React from "react";
+import {
+  useTable,
+  useSortBy,
+  useFilters,
+  useGlobalFilter,
+  useAsyncDebounce
+} from "react-table";
 import { PlayerWithZScore } from "../z_score/player_z_score";
+import { matchSorter } from "match-sorter";
+
+// Define a default UI for filtering
+const GlobalFilter = ({
+  preGlobalFilteredRows,
+  globalFilter,
+  setGlobalFilter
+}) => {
+  const count = preGlobalFilteredRows.length;
+  const [value, setValue] = React.useState(globalFilter);
+  const onChange = useAsyncDebounce((value) => {
+    setGlobalFilter(value || undefined);
+  }, 200);
+
+  return (
+    <span>
+      Search:{" "}
+      <input
+        value={value || ""}
+        onChange={(e) => {
+          setValue(e.target.value);
+          onChange(e.target.value);
+        }}
+        placeholder={`${count} records...`}
+        style={{
+          fontSize: "1.1rem",
+          border: "0"
+        }}
+      />
+    </span>
+  );
+};
+
+const DefaultColumnFilter = ({
+  column: { filterValue, preFilteredRows, setFilter }
+}) => {
+  const count = preFilteredRows.length;
+
+  return (
+    <input
+      value={filterValue || ""}
+      onChange={(e) => {
+        setFilter(e.target.value || undefined); // Set undefined to remove the filter entirely
+      }}
+      placeholder={`Search ${count} records...`}
+    />
+  );
+};
+
+const fuzzyTextFilterFn = (rows, id, filterValue) => {
+  return matchSorter(rows, filterValue, { keys: [(row) => row.values[id]] });
+};
+
+// Let the table remove the filter if the string is empty
+fuzzyTextFilterFn.autoRemove = (val) => !val;
 
 // @ts-ignore
 export default ({ columns, data }) => {
+  const filterTypes = React.useMemo(
+    () => ({
+      // Add a new fuzzyTextFilterFn filter type.
+      fuzzyText: fuzzyTextFilterFn,
+      // Or, override the default text filter to use
+      // "startWith"
+      text: (rows, id, filterValue) => {
+        return rows.filter((row) => {
+          const rowValue = row.values[id];
+          return rowValue !== undefined
+            ? String(rowValue)
+                .toLowerCase()
+                .startsWith(String(filterValue).toLowerCase())
+            : true;
+        });
+      }
+    }),
+    []
+  );
+
+  const defaultColumn = React.useMemo(
+    () => ({
+      // Let's set up our default Filter UI
+      Filter: DefaultColumnFilter
+    }),
+    []
+  );
+
   const tableInstance = useTable<PlayerWithZScore>(
-    { columns, data },
+    {
+      columns,
+      data,
+      initialState: {
+        sortBy: [
+          {
+            id: "sco",
+            desc: true
+          }
+        ]
+      },
+      defaultColumn,
+      filterTypes
+    },
+    useFilters,
+    useGlobalFilter,
     useSortBy
   );
 
@@ -13,46 +118,60 @@ export default ({ columns, data }) => {
     getTableBodyProps,
     headerGroups,
     rows,
-    prepareRow
+    prepareRow,
+    state,
+    preGlobalFilteredRows,
+    setGlobalFilter,
+    visibleColumns
   } = tableInstance;
 
   return (
-    // apply the table props
     <table {...getTableProps()}>
       <thead>
-        {
-          // Loop over the header rows
-          headerGroups.map((headerGroup) => (
-            // Apply the header row props
-            <tr {...headerGroup.getHeaderGroupProps()}>
-              {
-                // Loop over the headers in each row
-                headerGroup.headers.map((column) => (
-                  // Apply the header cell props
-                  // @ts-ignore
-                  <th {...column.getHeaderProps(column.getSortByToggleProps())}>
-                    {
-                      // Render the header
-                      column.render("Header")
-                    }
-                    {/* Add a sort direction indicator */}
-                    <span>
-                      {
-                        // @ts-ignore
-                        column.isSorted
-                          ? // @ts-ignore
-                            column.isSortedDesc
-                            ? " 🔽"
-                            : " 🔼"
-                          : ""
-                      }
-                    </span>
-                  </th>
-                ))
-              }
-            </tr>
-          ))
-        }
+        {headerGroups.map((headerGroup) => (
+          <tr {...headerGroup.getHeaderGroupProps()}>
+            {headerGroup.headers.map((column) => (
+              // @ts-ignore
+              <th {...column.getHeaderProps(column.getSortByToggleProps())}>
+                {column.render("Header")}
+                <span>
+                  {
+                    // @ts-ignore
+                    column.isSorted
+                      ? // @ts-ignore
+                        column.isSortedDesc
+                        ? " 🔽"
+                        : " 🔼"
+                      : ""
+                  }
+                </span>
+                <div
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return true;
+                  }}
+                >
+                  {column.canFilter ? column.render("Filter") : null}
+                </div>
+              </th>
+            ))}
+          </tr>
+        ))}
+        <tr>
+          <th
+            colSpan={visibleColumns.length}
+            style={{
+              textAlign: "left"
+            }}
+          >
+            <GlobalFilter
+              preGlobalFilteredRows={preGlobalFilteredRows}
+              globalFilter={state.globalFilter}
+              setGlobalFilter={setGlobalFilter}
+            />
+          </th>
+        </tr>
       </thead>
       {/* Apply the table body props */}
       <tbody {...getTableBodyProps()}>

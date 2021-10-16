@@ -8,15 +8,18 @@ export type ZScoreRateFn = (made: number, attempted: number) => string;
 export const getZScoreFn = (
   players: Player[],
   playersLeft: number,
-  statName: keyof Player
+  statName: keyof Player,
+  statsLeft: Record<string, number>
 ): ZScoreFn => {
-  const mod = statName === "to" ? -1 : 1;
+  let mod = statName === "to" ? -1 : 1;
 
   players.sort((a: Player, b: Player) => {
     return (
-      (a[statName] > b[statName] ? 1 : a[statName] < b[statName] ? -1 : 0) * mod
+      (a[statName] > b[statName] ? -1 : a[statName] < b[statName] ? 1 : 0) * mod
     );
   });
+
+  mod = mod === -1 ? -0.1 : 1;
 
   const top_n_players = players.slice(0, playersLeft);
 
@@ -24,14 +27,16 @@ export const getZScoreFn = (
 
   const avg = getAverage(stat_arr as number[]);
   const std_dev = getStandardDeviation(stat_arr as number[]);
+  const statMod = statsLeft[statName];
 
-  return (num: number) => (((num - avg) * mod) / std_dev).toFixed(2);
+  return (num: number) => (((num - avg) * mod * statMod) / std_dev).toFixed(2);
 };
 
 export const getZScoreFnForRate = (
   players: Player[],
   playersLeft: number,
-  statName: "fg" | "ft"
+  statName: "fg" | "ft",
+  statsLeft: Record<string, number>
 ): ZScoreRateFn => {
   players.sort((a: Player, b: Player) => {
     // @ts-ignore
@@ -55,7 +60,7 @@ export const getZScoreFnForRate = (
     const a_rate = a[statName + "m"] / a[statName + "a"];
     // @ts-ignore
     const b_rate = b[statName + "m"] / b[statName + "a"];
-    return a_rate > b_rate ? 1 : a_rate < b_rate ? -1 : 0;
+    return a_rate > b_rate ? -1 : a_rate < b_rate ? 1 : 0;
   });
 
   const rate_stat_arr = top_n_players.map(
@@ -65,10 +70,12 @@ export const getZScoreFnForRate = (
   const rate_avg = getAverage(rate_stat_arr as number[]);
   const rate_std_dev = getStandardDeviation(rate_stat_arr as number[]);
 
+  const statMod = statsLeft[statName + "m"];
+
   return (made: number, attempted: number) => {
     const made_z = (made - made_avg) / made_std_dev;
     const rate_z = (made / attempted - rate_avg) / rate_std_dev;
 
-    return ((made_z + rate_z) / 2).toFixed(2);
+    return ((made_z * 0.5 + rate_z * 0.5) * 0.2 * statMod).toFixed(2);
   };
 };

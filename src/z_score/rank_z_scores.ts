@@ -11,10 +11,10 @@ const rankPosition = (
     .map((player) => {
       return {
         id: player.id,
-        score: punts ? player.punted_score : player.tot_score
+        score: parseFloat(punts ? player.punted_score : player.tot_score)
       };
     })
-    .sort((a, b) => (a.score > b.score ? 1 : b.score > a.score ? -1 : 0))
+    .sort((a, b) => (a.score > b.score ? -1 : b.score > a.score ? 1 : 0))
     .map((player) => player.id);
 };
 
